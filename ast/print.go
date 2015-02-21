@@ -67,6 +67,9 @@ func (p *printer) print(x reflect.Value) {
 			p.printf("%q", token.TokenName(v))
 			p.printf("\n")
 			return
+		case bool:
+			p.printf("%t", v)
+			p.printf("\n")
 		}
 	}
 }

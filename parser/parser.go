@@ -62,6 +62,12 @@ func (p *parser) parseExpr() ast.Expr {
 			return p.parseNum()
 		case token.IDENT:
 			return p.parseIdent()
+		case token.TRUE:
+			p.next()
+			return &ast.BooleanExpr{Bool: true}
+		case token.FALSE:
+			p.next()
+			return &ast.BooleanExpr{Bool: false}
 		}
 	}
 	p.errorf("unexpected token %s", token.TokenName(p.tok))
