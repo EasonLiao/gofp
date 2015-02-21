@@ -43,27 +43,30 @@ const (
 )
 
 var tokens = [...]string{
-	LT:     "<",
-	GT:     ">",
-	LE:     "<=",
-	GE:     ">=",
-	EQ:     "=",
-	LBRACK: "[",
-	RBRACK: "]",
-	LPAREN: "(",
-	RPAREN: ")",
-	COMMA:  ",",
-	ADD:    "+",
-	SUB:    "-",
-	MULT:   "*",
-	DIV:    "/",
-	TRUE:   "true",
-	FALSE:  "false",
-	DO:     "do",
-	DEF:    "def",
-	LET:    "let",
-	IF:     "if",
-	FN:     "fn",
+	ILLEGAL: "[ILLEGAL]",
+	EOF:     "[EOF]",
+	NUM:     "[NUM]",
+	LT:      "<",
+	GT:      ">",
+	LE:      "<=",
+	GE:      ">=",
+	EQ:      "=",
+	LBRACK:  "[",
+	RBRACK:  "]",
+	LPAREN:  "(",
+	RPAREN:  ")",
+	COMMA:   ",",
+	ADD:     "+",
+	SUB:     "-",
+	MULT:    "*",
+	DIV:     "/",
+	TRUE:    "true",
+	FALSE:   "false",
+	DO:      "do",
+	DEF:     "def",
+	LET:     "let",
+	IF:      "if",
+	FN:      "fn",
 }
 
 var keywords map[string]Token
@@ -81,4 +84,11 @@ func Lookup(ident string) Token {
 		return tok
 	}
 	return IDENT
+}
+
+func TokenName(tok Token) string {
+	if int(tok) > len(tokens) {
+		return "[INVALID TOKEN]"
+	}
+	return tokens[tok]
 }
