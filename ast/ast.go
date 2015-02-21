@@ -9,7 +9,7 @@ import (
 type Expr interface {
 	exprNode()
 	ExprName() string
-	Eval() (*Object, error)
+	Eval(sc *Scope) (*Object, error)
 }
 
 type (
@@ -67,33 +67,44 @@ type (
 	}
 )
 
-func (*IdentExpr) Eval() (*Object, error) {
-	// TODO
-	return nil, nil
+func (expr *IdentExpr) Eval(sc *Scope) (*Object, error) {
+	obj := sc.Lookup(expr.Name)
+	if obj == nil {
+		return nil, fmt.Errorf("%q is not defined.", expr.Name)
+	}
+	return obj, nil
 }
 
-func (expr *NumExpr) Eval() (*Object, error) {
+func (expr *NumExpr) Eval(sc *Scope) (*Object, error) {
 	return createDouble(expr.Value), nil
 }
 
-func (expr *BooleanExpr) Eval() (*Object, error) {
+func (expr *BooleanExpr) Eval(sc *Scope) (*Object, error) {
 	return createBoolean(expr.Bool), nil
 }
 
-func (*DefExpr) Eval() (*Object, error) {
+func (expr *DefExpr) Eval(sc *Scope) (*Object, error) {
+	obj, err := expr.Expr.Eval(sc)
+	if err != nil {
+		return nil, err
+	}
+	if obj == NilObj {
+		return nil, fmt.Errorf("Can't bind nil object to symbol.")
+	}
+	// Put it into symbol table.
+	sc.Insert(expr.Ident.Name, obj)
+	return NilObj, nil
+}
+
+func (*FuncExpr) Eval(sc *Scope) (*Object, error) {
 	// TODO
 	return nil, nil
 }
 
-func (*FuncExpr) Eval() (*Object, error) {
-	// TODO
-	return nil, nil
-}
-
-func (expr *ExprList) Eval() (*Object, error) {
+func (expr *ExprList) Eval(sc *Scope) (*Object, error) {
 	objects := make([]*Object, 0, len(expr.Exprs))
 	for _, e := range expr.Exprs {
-		obj, err := e.Eval()
+		obj, err := e.Eval(sc)
 		if err != nil {
 			return nil, err
 		}
@@ -102,13 +113,13 @@ func (expr *ExprList) Eval() (*Object, error) {
 	return createList(objects), nil
 }
 
-func (*CallExpr) Eval() (*Object, error) {
+func (*CallExpr) Eval(sc *Scope) (*Object, error) {
 	// TODO
 	return nil, nil
 }
 
-func (expr *DoExpr) Eval() (*Object, error) {
-	obj, err := expr.Exprs.Eval()
+func (expr *DoExpr) Eval(sc *Scope) (*Object, error) {
+	obj, err := expr.Exprs.Eval(sc)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +130,8 @@ func (expr *DoExpr) Eval() (*Object, error) {
 	return objects[len(objects)-1], nil
 }
 
-func (expr *IfExpr) Eval() (*Object, error) {
-	cond, err := expr.Cond.Eval()
+func (expr *IfExpr) Eval(sc *Scope) (*Object, error) {
+	cond, err := expr.Cond.Eval(sc)
 	if err != nil {
 		return nil, err
 	}
@@ -129,18 +140,18 @@ func (expr *IfExpr) Eval() (*Object, error) {
 	}
 	condRes := cond.Value.(bool)
 	if condRes {
-		return expr.Then.Eval()
+		return expr.Then.Eval(sc)
 	} else {
-		return expr.Else.Eval()
+		return expr.Else.Eval(sc)
 	}
 }
 
-func (expr *BinaryOp) Eval() (*Object, error) {
-	left, err := expr.Left.Eval()
+func (expr *BinaryOp) Eval(sc *Scope) (*Object, error) {
+	left, err := expr.Left.Eval(sc)
 	if err != nil {
 		return nil, err
 	}
-	right, err := expr.Right.Eval()
+	right, err := expr.Right.Eval(sc)
 	if err != nil {
 		return nil, err
 	}
@@ -167,18 +178,15 @@ func (expr *BinaryOp) Eval() (*Object, error) {
 	return nil, fmt.Errorf("invalid op %q", token.TokenName(expr.Op))
 }
 
-func (expr *MultiOp) Eval() (*Object, error) {
-	list, err := expr.Exprs.Eval()
+func (expr *MultiOp) Eval(sc *Scope) (*Object, error) {
+	list, err := expr.Exprs.Eval(sc)
 	if err != nil {
 		return nil, err
 	}
-
 	objects := list.Value.([]*Object)
-
 	if len(objects) == 0 {
 		return NilObj, nil
 	}
-
 	var opFun func(v1, v2 float64) float64
 	switch expr.Op {
 	case token.ADD:
@@ -190,13 +198,10 @@ func (expr *MultiOp) Eval() (*Object, error) {
 	case token.SUB:
 		opFun = func(v1, v2 float64) float64 { return v1 - v2 }
 	}
-
 	if objects[0].Kind != Double {
 		return nil, fmt.Errorf("operand must be double numbers")
 	}
-
 	operand := objects[0].Value.(float64)
-
 	for _, obj := range objects[1:] {
 		if obj.Kind != Double {
 			return nil, fmt.Errorf("operand must be double numbers")

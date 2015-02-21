@@ -1,9 +1,5 @@
 package token
 
-import (
-	"fmt"
-)
-
 type Token int
 
 const (
@@ -76,7 +72,6 @@ func init() {
 	for i := keyword_beg; i < keyword_end; i++ {
 		keywords[tokens[i]] = i
 	}
-	fmt.Println("len", len(keywords))
 }
 
 func Lookup(ident string) Token {
