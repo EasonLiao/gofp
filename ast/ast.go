@@ -96,9 +96,13 @@ func (expr *DefExpr) Eval(sc *Scope) (*Object, error) {
 	return NilObj, nil
 }
 
-func (*FuncExpr) Eval(sc *Scope) (*Object, error) {
-	// TODO
-	return nil, nil
+func (expr *FuncExpr) Eval(sc *Scope) (*Object, error) {
+	params := make([]string, 0, len(expr.Params))
+	for _, ident := range expr.Params {
+		params = append(params, ident.Name)
+		fmt.Println(ident.Name)
+	}
+	return createFunc(NewScope(nil), params, expr.Expr), nil
 }
 
 func (expr *ExprList) Eval(sc *Scope) (*Object, error) {
@@ -113,9 +117,30 @@ func (expr *ExprList) Eval(sc *Scope) (*Object, error) {
 	return createList(objects), nil
 }
 
-func (*CallExpr) Eval(sc *Scope) (*Object, error) {
-	// TODO
-	return nil, nil
+func (expr *CallExpr) Eval(sc *Scope) (*Object, error) {
+	obj, err := expr.Fun.Eval(sc)
+	if err != nil {
+		return nil, err
+	}
+	if obj.Kind != Func {
+		return nil, fmt.Errorf("The object is not a function object.")
+	}
+	funObj := obj.Value.(*FuncValue)
+	numParams := len(funObj.Params)
+	numArgs := len(expr.Args.Exprs)
+	if numParams != numArgs {
+		return nil, fmt.Errorf("Wrong number of arguments(%d), expect %d", numArgs, numParams)
+	}
+	argList, err := expr.Args.Eval(sc)
+	if err != nil {
+		return nil, err
+	}
+	args := argList.Value.([]*Object)
+	// Binding arguments to function's closure.
+	for idx, param := range funObj.Params {
+		funObj.Closure.Insert(param, args[idx])
+	}
+	return funObj.Body.Eval(funObj.Closure)
 }
 
 func (expr *DoExpr) Eval(sc *Scope) (*Object, error) {

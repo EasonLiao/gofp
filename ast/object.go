@@ -47,3 +47,13 @@ func createBoolean(b bool) *Object {
 func createList(list []*Object) *Object {
 	return &Object{Kind: List, Value: list}
 }
+
+func createFunc(sc *Scope, params []string, body Expr) *Object {
+	return &Object{Kind: Func, Value: &FuncValue{Closure: sc, Params: params, Body: body}}
+}
+
+type FuncValue struct {
+	Closure *Scope
+	Params  []string
+	Body    Expr
+}
