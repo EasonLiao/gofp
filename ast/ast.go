@@ -65,6 +65,16 @@ type (
 		Op    token.Token
 		Exprs *ExprList
 	}
+
+	BindExpr struct {
+		Ident *IdentExpr
+		Value Expr
+	}
+
+	LetExpr struct {
+		Bindings []*BindExpr
+		Body     Expr
+	}
 )
 
 func (expr *IdentExpr) Eval(sc *Scope) (*Object, error) {
@@ -100,7 +110,6 @@ func (expr *FuncExpr) Eval(sc *Scope) (*Object, error) {
 	params := make([]string, 0, len(expr.Params))
 	for _, ident := range expr.Params {
 		params = append(params, ident.Name)
-		fmt.Println(ident.Name)
 	}
 	return createFunc(NewScope(nil), params, expr.Expr), nil
 }
@@ -237,6 +246,26 @@ func (expr *MultiOp) Eval(sc *Scope) (*Object, error) {
 	return createDouble(operand), nil
 }
 
+func (expr *BindExpr) Eval(sc *Scope) (*Object, error) {
+	obj, err := expr.Value.Eval(sc)
+	if err != nil {
+		return nil, err
+	}
+	sc.Insert(expr.Ident.Name, obj)
+	return NilObj, nil
+}
+
+func (expr *LetExpr) Eval(sc *Scope) (*Object, error) {
+	newScope := NewScope(sc)
+	for _, binding := range expr.Bindings {
+		_, err := binding.Eval(newScope)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return expr.Body.Eval(newScope)
+}
+
 func (*IdentExpr) exprNode()   {}
 func (*NumExpr) exprNode()     {}
 func (*BooleanExpr) exprNode() {}
@@ -248,6 +277,8 @@ func (*DoExpr) exprNode()      {}
 func (*IfExpr) exprNode()      {}
 func (*BinaryOp) exprNode()    {}
 func (*MultiOp) exprNode()     {}
+func (*BindExpr) exprNode()    {}
+func (*LetExpr) exprNode()     {}
 
 func (*IdentExpr) ExprName() string   { return "IdentExpr" }
 func (*NumExpr) ExprName() string     { return "NumExpr" }
@@ -260,3 +291,5 @@ func (*DoExpr) ExprName() string      { return "DoExpr" }
 func (*IfExpr) ExprName() string      { return "IfExpr" }
 func (*BinaryOp) ExprName() string    { return "BinaryOP" }
 func (*MultiOp) ExprName() string     { return "MultiOp" }
+func (*BindExpr) ExprName() string    { return "BindExpr" }
+func (*LetExpr) ExprName() string     { return "LetExpr" }

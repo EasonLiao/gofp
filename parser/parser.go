@@ -47,6 +47,8 @@ func (p *parser) parseExpr() ast.Expr {
 			return p.parseDoBlock()
 		case token.DEF:
 			return p.parseDef()
+		case token.LET:
+			return p.parseLet()
 		case token.ADD, token.SUB, token.MULT, token.DIV:
 			return p.parseMultiOp()
 		case token.LT, token.GT, token.LE, token.GE, token.EQ:
@@ -193,6 +195,27 @@ func (p *parser) match(tok token.Token) {
 		return
 	}
 	p.next()
+}
+
+func (p *parser) parseLet() *ast.LetExpr {
+	if p.err != nil {
+		return nil
+	}
+	p.match(token.LET)
+	p.match(token.LBRACK)
+	bindings := make([]*ast.BindExpr, 0, 1)
+	bindings = append(bindings, p.parseBindingPair())
+	for p.err == nil && p.tok == token.IDENT {
+		bindings = append(bindings, p.parseBindingPair())
+	}
+	p.match(token.RBRACK)
+	return &ast.LetExpr{Bindings: bindings, Body: p.parseExpr()}
+}
+
+func (p *parser) parseBindingPair() *ast.BindExpr {
+	ident := p.parseIdent()
+	expr := p.parseExpr()
+	return &ast.BindExpr{Ident: ident, Value: expr}
 }
 
 // check whether current token can be a start of an expression.
