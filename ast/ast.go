@@ -7,9 +7,10 @@ import (
 )
 
 type Expr interface {
-	exprNode()
 	ExprName() string
 	Eval(sc *Scope) (*Object, error)
+	// Given the scope, collects all the unresolved identifiers in the expression, used for closure capture.
+	collectUnresolvedNames(*Scope, map[string]bool)
 }
 
 type (
@@ -77,6 +78,7 @@ type (
 	}
 )
 
+// Eval implementation.
 func (expr *IdentExpr) Eval(sc *Scope) (*Object, error) {
 	obj := sc.Lookup(expr.Name)
 	if obj == nil {
@@ -111,7 +113,18 @@ func (expr *FuncExpr) Eval(sc *Scope) (*Object, error) {
 	for _, ident := range expr.Params {
 		params = append(params, ident.Name)
 	}
-	return createFunc(NewScope(nil), params, expr.Expr), nil
+	unresolvedNames := make(map[string]bool)
+	expr.collectUnresolvedNames(NewScope(nil), unresolvedNames)
+	closure := NewScope(nil)
+	// Capture all the unresolved names from current scope.
+	for name, _ := range unresolvedNames {
+		obj := sc.Lookup(name)
+		if obj == nil {
+			return nil, fmt.Errorf("uncaptured name %q", name)
+		}
+		closure.Insert(name, obj)
+	}
+	return createFunc(closure, params, expr.Expr), nil
 }
 
 func (expr *ExprList) Eval(sc *Scope) (*Object, error) {
@@ -266,19 +279,78 @@ func (expr *LetExpr) Eval(sc *Scope) (*Object, error) {
 	return expr.Body.Eval(newScope)
 }
 
-func (*IdentExpr) exprNode()   {}
-func (*NumExpr) exprNode()     {}
-func (*BooleanExpr) exprNode() {}
-func (*DefExpr) exprNode()     {}
-func (*FuncExpr) exprNode()    {}
-func (*ExprList) exprNode()    {}
-func (*CallExpr) exprNode()    {}
-func (*DoExpr) exprNode()      {}
-func (*IfExpr) exprNode()      {}
-func (*BinaryOp) exprNode()    {}
-func (*MultiOp) exprNode()     {}
-func (*BindExpr) exprNode()    {}
-func (*LetExpr) exprNode()     {}
+// collectUnresolvedNames implementation.
+func (expr *IdentExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	if sc.Lookup(expr.Name) == nil {
+		// if the name doesn't exit in current scope, add to unresolved set.
+		names[expr.Name] = true
+	}
+}
+
+func (expr *NumExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	// Do nothing.
+}
+
+func (expr *BooleanExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	// Do nothing.
+}
+
+func (expr *DefExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	// def should be only allowed to in outer-most scope, it shouldn't be called.
+	panic("why trying to find unresolved names in def expression.")
+}
+
+func (expr *FuncExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	newScope := NewScope(sc)
+	for _, param := range expr.Params {
+		// Add parameter names to scope, these don't need to be marked as unresolved inside of function.
+		newScope.Insert(param.Name, NilObj)
+	}
+	expr.Expr.collectUnresolvedNames(newScope, names)
+}
+
+func (expr *ExprList) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	for _, expr := range expr.Exprs {
+		expr.collectUnresolvedNames(sc, names)
+	}
+}
+
+func (expr *CallExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Fun.collectUnresolvedNames(sc, names)
+	expr.Args.collectUnresolvedNames(sc, names)
+}
+
+func (expr *DoExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Exprs.collectUnresolvedNames(sc, names)
+}
+
+func (expr *IfExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Cond.collectUnresolvedNames(sc, names)
+	expr.Then.collectUnresolvedNames(sc, names)
+	expr.Else.collectUnresolvedNames(sc, names)
+}
+
+func (expr *BinaryOp) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Left.collectUnresolvedNames(sc, names)
+	expr.Right.collectUnresolvedNames(sc, names)
+}
+
+func (expr *MultiOp) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Exprs.collectUnresolvedNames(sc, names)
+}
+
+func (expr *BindExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	expr.Value.collectUnresolvedNames(sc, names)
+	sc.Insert(expr.Ident.Name, NilObj)
+}
+
+func (expr *LetExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	newScope := NewScope(sc)
+	for _, binding := range expr.Bindings {
+		binding.collectUnresolvedNames(newScope, names)
+	}
+	expr.Body.collectUnresolvedNames(newScope, names)
+}
 
 func (*IdentExpr) ExprName() string   { return "IdentExpr" }
 func (*NumExpr) ExprName() string     { return "NumExpr" }
