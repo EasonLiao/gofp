@@ -32,6 +32,7 @@ const (
 	FALSE // 'false'
 	DO    // 'do'
 	DEF   // 'def', declare variable.
+	DEFN  // 'defn', declare function.
 	LET   // 'let'
 	IF    // 'if'
 	FN    // 'fn'
@@ -60,6 +61,7 @@ var tokens = [...]string{
 	FALSE:   "false",
 	DO:      "do",
 	DEF:     "def",
+	DEFN:    "defn",
 	LET:     "let",
 	IF:      "if",
 	FN:      "fn",

@@ -47,6 +47,8 @@ func (p *parser) parseExpr() ast.Expr {
 			return p.parseDoBlock()
 		case token.DEF:
 			return p.parseDef()
+		case token.DEFN:
+			return p.parseDefn()
 		case token.LET:
 			return p.parseLet()
 		case token.ADD, token.SUB, token.MULT, token.DIV:
@@ -70,6 +72,8 @@ func (p *parser) parseExpr() ast.Expr {
 		case token.FALSE:
 			p.next()
 			return &ast.BooleanExpr{Bool: false}
+		case token.EOF:
+			return &ast.NilExpr{}
 		}
 	}
 	p.errorf("unexpected token %s", token.TokenName(p.tok))
@@ -159,6 +163,23 @@ func (p *parser) parseDef() *ast.DefExpr {
 	ident := p.parseIdent()
 	expr := p.parseExpr()
 	return &ast.DefExpr{Ident: ident, Expr: expr}
+}
+
+func (p *parser) parseDefn() *ast.DefnExpr {
+	if p.err != nil {
+		return nil
+	}
+	p.match(token.DEFN)
+	ident := p.parseIdent()
+	p.match(token.LBRACK)
+	parameters := make([]*ast.IdentExpr, 0)
+	for p.tok == token.IDENT && p.err == nil {
+		parameters = append(parameters, p.parseIdent())
+	}
+	p.match(token.RBRACK)
+	body := p.parseExpr()
+	fnExpr := &ast.FuncExpr{Params: parameters, Expr: body}
+	return &ast.DefnExpr{Ident: ident, Expr: fnExpr}
 }
 
 func (p *parser) parseBinaryOp() *ast.BinaryOp {

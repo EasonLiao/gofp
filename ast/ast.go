@@ -7,13 +7,15 @@ import (
 )
 
 type Expr interface {
-	ExprName() string
 	Eval(sc *Scope) (*Object, error)
 	// Given the scope, collects all the unresolved identifiers in the expression, used for closure capture.
 	collectUnresolvedNames(*Scope, map[string]bool)
 }
 
 type (
+	NilExpr struct {
+	}
+
 	IdentExpr struct {
 		Name string
 	}
@@ -27,6 +29,11 @@ type (
 	}
 
 	DefExpr struct {
+		Ident *IdentExpr
+		Expr  Expr
+	}
+
+	DefnExpr struct {
 		Ident *IdentExpr
 		Expr  Expr
 	}
@@ -78,6 +85,10 @@ type (
 	}
 )
 
+func (*NilExpr) Eval(sc *Scope) (*Object, error) {
+	return NilObj, nil
+}
+
 // Eval implementation.
 func (expr *IdentExpr) Eval(sc *Scope) (*Object, error) {
 	obj := sc.Lookup(expr.Name)
@@ -108,6 +119,22 @@ func (expr *DefExpr) Eval(sc *Scope) (*Object, error) {
 	return NilObj, nil
 }
 
+func (expr *DefnExpr) Eval(sc *Scope) (*Object, error) {
+	newScope := NewScope(sc)
+	// Since defn binds a name to a function which can call itself, binds the fun name with Self obj first.
+	newScope.Insert(expr.Ident.Name, SelfObj)
+	obj, err := expr.Expr.Eval(newScope)
+	if err != nil {
+		return nil, err
+	}
+	if obj == NilObj {
+		return nil, fmt.Errorf("Can't bind nil object to symbol.")
+	}
+	// Put it into symbol table.
+	sc.Insert(expr.Ident.Name, obj)
+	return NilObj, nil
+}
+
 func (expr *FuncExpr) Eval(sc *Scope) (*Object, error) {
 	params := make([]string, 0, len(expr.Params))
 	for _, ident := range expr.Params {
@@ -116,15 +143,20 @@ func (expr *FuncExpr) Eval(sc *Scope) (*Object, error) {
 	unresolvedNames := make(map[string]bool)
 	expr.collectUnresolvedNames(NewScope(nil), unresolvedNames)
 	closure := NewScope(nil)
+	funcObj := createFunc(closure, params, expr.Expr)
 	// Capture all the unresolved names from current scope.
 	for name, _ := range unresolvedNames {
 		obj := sc.Lookup(name)
 		if obj == nil {
 			return nil, fmt.Errorf("uncaptured name %q", name)
 		}
-		closure.Insert(name, obj)
+		if obj == SelfObj {
+			closure.Insert(name, funcObj)
+		} else {
+			closure.Insert(name, obj)
+		}
 	}
-	return createFunc(closure, params, expr.Expr), nil
+	return funcObj, nil
 }
 
 func (expr *ExprList) Eval(sc *Scope) (*Object, error) {
@@ -279,6 +311,10 @@ func (expr *LetExpr) Eval(sc *Scope) (*Object, error) {
 	return expr.Body.Eval(newScope)
 }
 
+func (expr *NilExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	panic("why tring to find unresolved names in nil expression")
+}
+
 // collectUnresolvedNames implementation.
 func (expr *IdentExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
 	if sc.Lookup(expr.Name) == nil {
@@ -297,6 +333,11 @@ func (expr *BooleanExpr) collectUnresolvedNames(sc *Scope, names map[string]bool
 
 func (expr *DefExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
 	// def should be only allowed to in outer-most scope, it shouldn't be called.
+	panic("why trying to find unresolved names in def expression.")
+}
+
+func (expr *DefnExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
+	// defn should be only allowed to in outer-most scope, it shouldn't be called.
 	panic("why trying to find unresolved names in def expression.")
 }
 
@@ -351,17 +392,3 @@ func (expr *LetExpr) collectUnresolvedNames(sc *Scope, names map[string]bool) {
 	}
 	expr.Body.collectUnresolvedNames(newScope, names)
 }
-
-func (*IdentExpr) ExprName() string   { return "IdentExpr" }
-func (*NumExpr) ExprName() string     { return "NumExpr" }
-func (*BooleanExpr) ExprName() string { return "BooleanExpr" }
-func (*DefExpr) ExprName() string     { return "DefExpr" }
-func (*FuncExpr) ExprName() string    { return "FuncExpr" }
-func (*ExprList) ExprName() string    { return "ExprList" }
-func (*CallExpr) ExprName() string    { return "CallExpr" }
-func (*DoExpr) ExprName() string      { return "DoExpr" }
-func (*IfExpr) ExprName() string      { return "IfExpr" }
-func (*BinaryOp) ExprName() string    { return "BinaryOP" }
-func (*MultiOp) ExprName() string     { return "MultiOp" }
-func (*BindExpr) ExprName() string    { return "BindExpr" }
-func (*LetExpr) ExprName() string     { return "LetExpr" }

@@ -6,6 +6,7 @@ type Object struct {
 }
 
 var NilObj = &Object{Kind: Nil, Value: nil}
+var SelfObj = &Object{Kind: Self, Value: nil}
 
 type ObjKind int
 
@@ -16,6 +17,7 @@ const (
 	Boolean
 	List
 	Nil
+	Self
 )
 
 func (o ObjKind) String() string {
@@ -32,6 +34,8 @@ func (o ObjKind) String() string {
 		return "List"
 	case Nil:
 		return "Nil"
+	case Self:
+		return "Self"
 	}
 	return "UNKNOWN"
 }
